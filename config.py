@@ -97,6 +97,9 @@ def parse_cli():
             help="Specifies the number of jobs to render simultaneously.",
         )
         parser.add_argument(
+            "-x", "--id_of_process",
+        )
+        parser.add_argument(
             "-r", "--resolution",
             help="Resolution, passed as \"height,width\"",
         )
@@ -189,6 +192,7 @@ def get_configuration(args):
         "video_dir": args.video_dir,
         "video_output_dir": args.video_output_dir,
         "tex_dir": args.tex_dir,
+        "id_of_process": args.id_of_process,
     }
 
     # Camera configuration
@@ -213,6 +217,10 @@ def get_configuration(args):
     else:
         jobs = 1
     config["job_number_of_render"] = jobs
+    pid = 0
+    if config["id_of_process"] is not None:
+        pid = int(config["id_of_process"])
+    config["id_of_process"] = pid
     return config
 
 

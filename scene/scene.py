@@ -2,6 +2,10 @@ import inspect
 import random
 import warnings
 import platform
+import subprocess
+import os
+import signal
+import time
 
 from tqdm import tqdm as ProgressDisplay
 import numpy as np
@@ -15,6 +19,13 @@ from manimlib.mobject.mobject import Mobject
 from manimlib.scene.scene_file_writer import SceneFileWriter
 from manimlib.utils.iterables import list_update
 
+
+# def scene_func(job_id, ClassName, **kwargs):
+#     print("scene_func", job_id, ClassName, kwargs)
+#     Scene(**kwargs)
+#     # for i in range(10 * 10000):
+#     #     # print(job_id, i)
+#     #     i = i + 1
 
 class Scene(Container):
     """
@@ -52,11 +63,16 @@ class Scene(Container):
         "end_at_animation_number": None,
         "leave_progress_bars": False,
         "job_number_of_render": 1,
-        "count_animations_number_only": False
+        "id_of_process": None
     }
 
     def __init__(self, **kwargs):
         Container.__init__(self, **kwargs)
+        self.count_animations_number_only = False
+        if self.id_of_process:
+            combine_movie = False
+        else:
+            combine_movie = True
         self.camera = self.camera_class(**self.camera_config)
         self.file_writer = SceneFileWriter(
             self, **self.file_writer_config,
@@ -81,7 +97,7 @@ class Scene(Container):
             except EndSceneEarlyException:
                 pass
             self.tear_down()
-            self.file_writer.finish()
+            self.file_writer.finish(combine_movie)
             self.print_end_message()
 
     def setup(self):
@@ -109,39 +125,72 @@ class Scene(Container):
 
     def simultaneously_construct(self, **kwargs):
         print("simultaneously_construct")
-        thread_num = self.job_number_of_render
+        job_number = self.job_number_of_render
         self.job_number_of_render = 1
         self.count_animations_number_only = True
         self.construct()
         animation_num = self.num_plays
         print("job_number_of_render: %d, animation_num: %d"%(
-            thread_num, self.num_plays))
+            job_number, self.num_plays))
 
-        if thread_num > self.num_plays:
-            thread_num = self.num_plays
-        step_num = int(self.num_plays / thread_num)
+        if job_number > self.num_plays:
+            job_number = self.num_plays
+        step_num = int(self.num_plays / job_number)
 
         kwargs["job_number_of_render"] = 1
         kwargs["count_animations_number_only"] = False
 
+        def scene_func( **kwargs):
+            s = self.__init__(**kwargs)
+
         import threading, time
-        for i in range(thread_num):
-            kwargs["start_at_animation_number"] = i * step_num
-            kwargs["end_at_animation_number"] = (i+1) * step_num - 1
-            if i >= thread_num - 1:
-                kwargs["end_at_animation_number"] = animation_num
+        print("job_number {} step_num {}".format(job_number, step_num))
+        # for i in range(job_number):
+        #     kwargs["id_of_process"] = i
+        #     kwargs["start_at_animation_number"] = i * step_num
+        #     kwargs["end_at_animation_number"] = (i+1) * step_num - 1
+        #     if i >= job_number - 1:
+        #         kwargs["end_at_animation_number"] = animation_num - 1
+        #     # print(kwargs)
+        #     threading.Thread(target=scene_func, kwargs=(kwargs)).start()
 
-            def scene_func():
-                self.__init__(**kwargs)
-                # for i in range(10):
-                    # print(i, kwargs)
-                #     time.sleep(1)
+        # with concurrent.futures.ProcessPoolExecutor(max_workers=job_number) as executor:
+        #         futures = [executor.submit(scene_func, job_id, "abc", **kwargs) for job_id in range(job_number)]
+        #         for future in concurrent.futures.as_completed(futures):
+        #                 pass
 
-            threading.Thread(target=scene_func, args=()).start()
+        plist = []
+        for i in range(job_number):
+            start_at_animation_number = i * step_num
+            end_at_animation_number = (i+1) * step_num - 1
+            if i >= job_number - 1:
+                end_at_animation_number = animation_num
+            command = [
+                "manim", 
+                "ddmath/test.py",
+                self.__class__.__name__,
+                "-l",
+                "-n{},{}".format(start_at_animation_number, end_at_animation_number),
+                "-x{}".format(i)
+            ]
+            # print(*command)
+            p = subprocess.Popen(command)
+            plist.append(p)
 
-            # self.__init__(**kwargs)
-            print("thread %d"%i)
-                
+        while True:
+            running = False
+            for i in range(job_number):
+                p = plist[i]
+                poll = p.poll()
+                if poll == None:
+                    # p.subprocess is alive
+                    running = True
+            if not running:
+                break
+            time.sleep(1)
+        # todo: combine movie
+        self.file_writer.finish(True)
+
 
     def __str__(self):
         return self.__class__.__name__
@@ -853,12 +902,15 @@ class Scene(Container):
         the number of animations that need to be played, and 
         raises an EndSceneEarlyException if they don't correspond.
         """
-        
+        # print(self.id_of_process, self.skip_animations, self.num_plays,
+        #     self.start_at_animation_number, self.end_at_animation_number)
         if self.start_at_animation_number:
-            if self.num_plays == self.start_at_animation_number:
+            if self.num_plays < self.start_at_animation_number:
+                self.skip_animations = True
+            if self.num_plays >= self.start_at_animation_number:
                 self.skip_animations = False
         if self.end_at_animation_number:
-            if self.num_plays >= self.end_at_animation_number:
+            if self.num_plays > self.end_at_animation_number:
                 self.skip_animations = True
                 raise EndSceneEarlyException()
 
@@ -883,6 +935,7 @@ class Scene(Container):
             to the video file stream.
         """
         def wrapper(self, *args, **kwargs):
+            # print("wrapper", self.__dict__)
             if not self.count_animations_number_only:
                 self.update_skipping_status()
                 allow_write = not self.skip_animations

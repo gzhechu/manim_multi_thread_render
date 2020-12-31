@@ -5,6 +5,7 @@ import platform
 import subprocess as sp
 import sys
 import traceback
+import logging
 
 from manimlib.scene.scene import Scene
 from manimlib.utils.sounds import play_error_sound
@@ -147,6 +148,7 @@ def main(config):
             "end_at_animation_number",
             "leave_progress_bars",
             "job_number_of_render",
+            "id_of_process",
         ]
     ])
 

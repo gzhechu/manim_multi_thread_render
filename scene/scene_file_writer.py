@@ -365,7 +365,7 @@ class SceneFileWriter(object):
             if time_diff < frame_duration:
                 sleep(frame_duration - time_diff)
 
-    def finish(self):
+    def finish(self, combine_movie=True):
         """
         Finishes writing to the FFMPEG buffer.
         Combines the partial movie files into the
@@ -376,7 +376,8 @@ class SceneFileWriter(object):
         if self.write_to_movie:
             if hasattr(self, "writing_process"):
                 self.writing_process.terminate()
-            self.combine_movie_files()
+            if combine_movie:
+                self.combine_movie_files()
         if self.save_last_frame:
             self.scene.update_frame(ignore_skipping=True)
             self.save_final_image(self.scene.get_image())
