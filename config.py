@@ -93,6 +93,10 @@ def parse_cli():
                  "the rendering at the second value",
         )
         parser.add_argument(
+            "-j", "--job_number_of_render",
+            help="Specifies the number of jobs to render simultaneously.",
+        )
+        parser.add_argument(
             "-r", "--resolution",
             help="Resolution, passed as \"height,width\"",
         )
@@ -178,6 +182,7 @@ def get_configuration(args):
         "write_all": args.write_all,
         "start_at_animation_number": args.start_at_animation_number,
         "end_at_animation_number": None,
+        "job_number_of_render": args.job_number_of_render,
         "sound": args.sound,
         "leave_progress_bars": args.leave_progress_bars,
         "media_dir": args.media_dir,
@@ -203,6 +208,11 @@ def get_configuration(args):
         file_writer_config["save_last_frame"],
         config["start_at_animation_number"],
     ])
+    if config["job_number_of_render"] is not None:
+        jobs = int(config["job_number_of_render"])
+    else:
+        jobs = 1
+    config["job_number_of_render"] = jobs
     return config
 
 
