@@ -51,6 +51,8 @@ class Scene(Container):
         "start_at_animation_number": None,
         "end_at_animation_number": None,
         "leave_progress_bars": False,
+        "job_number_of_render": 1,
+        "count_animations_number_only": False
     }
 
     def __init__(self, **kwargs):
@@ -71,13 +73,16 @@ class Scene(Container):
             np.random.seed(self.random_seed)
 
         self.setup()
-        try:
-            self.construct()
-        except EndSceneEarlyException:
-            pass
-        self.tear_down()
-        self.file_writer.finish()
-        self.print_end_message()
+        if self.job_number_of_render > 1:
+            self.simultaneously_construct(**kwargs)
+        else:
+            try:
+                self.construct()
+            except EndSceneEarlyException:
+                pass
+            self.tear_down()
+            self.file_writer.finish()
+            self.print_end_message()
 
     def setup(self):
         """
@@ -101,6 +106,42 @@ class Scene(Container):
         the Scene.
         """
         pass  # To be implemented in subclasses
+
+    def simultaneously_construct(self, **kwargs):
+        print("simultaneously_construct")
+        thread_num = self.job_number_of_render
+        self.job_number_of_render = 1
+        self.count_animations_number_only = True
+        self.construct()
+        animation_num = self.num_plays
+        print("job_number_of_render: %d, animation_num: %d"%(
+            thread_num, self.num_plays))
+
+        if thread_num > self.num_plays:
+            thread_num = self.num_plays
+        step_num = int(self.num_plays / thread_num)
+
+        kwargs["job_number_of_render"] = 1
+        kwargs["count_animations_number_only"] = False
+
+        import threading, time
+        for i in range(thread_num):
+            kwargs["start_at_animation_number"] = i * step_num
+            kwargs["end_at_animation_number"] = (i+1) * step_num - 1
+            if i >= thread_num - 1:
+                kwargs["end_at_animation_number"] = animation_num
+
+            def scene_func():
+                self.__init__(**kwargs)
+                # for i in range(10):
+                    # print(i, kwargs)
+                #     time.sleep(1)
+
+            threading.Thread(target=scene_func, args=()).start()
+
+            # self.__init__(**kwargs)
+            print("thread %d"%i)
+                
 
     def __str__(self):
         return self.__class__.__name__
@@ -842,11 +883,12 @@ class Scene(Container):
             to the video file stream.
         """
         def wrapper(self, *args, **kwargs):
-            self.update_skipping_status()
-            allow_write = not self.skip_animations
-            self.file_writer.begin_animation(allow_write)
-            func(self, *args, **kwargs)
-            self.file_writer.end_animation(allow_write)
+            if not self.count_animations_number_only:
+                self.update_skipping_status()
+                allow_write = not self.skip_animations
+                self.file_writer.begin_animation(allow_write)
+                func(self, *args, **kwargs)
+                self.file_writer.end_animation(allow_write)
             self.num_plays += 1
         return wrapper
 
