@@ -1226,7 +1226,11 @@ class Scene(Container):
         self.increment_time(len(frames) * dt)
         if self.skip_animations:
             return
+        idx = int(time.time())
+        i = 0
         for frame in frames:
+            i += 1
+            # np.save('FRAME_{}_{}.npy'.format(idx, i), frame)
             self.file_writer.write_frame(frame)
 
     def add_sound(self, sound_file, time_offset=0, gain=None, **kwargs):
