@@ -68,6 +68,7 @@ class Scene(Container):
 
     def __init__(self, **kwargs):
         Container.__init__(self, **kwargs)
+        print(kwargs)
         self.count_animations_number_only = False
         if self.id_of_process:
             combine_movie = False
@@ -82,6 +83,7 @@ class Scene(Container):
         # TODO, remove need for foreground mobjects
         self.foreground_mobjects = []
         self.num_plays = 0
+        self.frame_num = 0
         self.time = 0
         self.original_skipping_status = self.skip_animations
         if self.random_seed is not None:
@@ -141,55 +143,56 @@ class Scene(Container):
         kwargs["count_animations_number_only"] = False
 
         def scene_func( **kwargs):
+            print(kwargs)
             s = self.__init__(**kwargs)
 
         import threading, time
         print("job_number {} step_num {}".format(job_number, step_num))
-        # for i in range(job_number):
-        #     kwargs["id_of_process"] = i
-        #     kwargs["start_at_animation_number"] = i * step_num
-        #     kwargs["end_at_animation_number"] = (i+1) * step_num - 1
-        #     if i >= job_number - 1:
-        #         kwargs["end_at_animation_number"] = animation_num - 1
-        #     # print(kwargs)
-        #     threading.Thread(target=scene_func, kwargs=(kwargs)).start()
+        for i in range(job_number):
+            kwargs["id_of_process"] = i + 1
+            kwargs["start_at_animation_number"] = i * step_num
+            kwargs["end_at_animation_number"] = (i+1) * step_num - 1
+            if i >= job_number - 1:
+                kwargs["end_at_animation_number"] = animation_num - 1
+            threading.Thread(target=scene_func, kwargs=(kwargs)).start()
 
-        # with concurrent.futures.ProcessPoolExecutor(max_workers=job_number) as executor:
-        #         futures = [executor.submit(scene_func, job_id, "abc", **kwargs) for job_id in range(job_number)]
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=job_number) as executor:
+        #         futures = [executor.submit(self.__init__, **kwargs) 
+        #             for job_id in range(job_number)]
         #         for future in concurrent.futures.as_completed(futures):
         #                 pass
 
-        plist = []
-        for i in range(job_number):
-            start_at_animation_number = i * step_num
-            end_at_animation_number = (i+1) * step_num - 1
-            if i >= job_number - 1:
-                end_at_animation_number = animation_num
-            command = [
-                "manim", 
-                "ddmath/test.py",
-                self.__class__.__name__,
-                "-l",
-                "-n{},{}".format(start_at_animation_number, end_at_animation_number),
-                "-x{}".format(i)
-            ]
-            # print(*command)
-            p = subprocess.Popen(command)
-            plist.append(p)
+        # plist = []
+        # for i in range(job_number):
+        #     start_at_animation_number = i * step_num
+        #     end_at_animation_number = (i+1) * step_num - 1
+        #     if i >= job_number - 1:
+        #         end_at_animation_number = animation_num
+        #     command = [
+        #         "manim", 
+        #         "ddmath/test.py",
+        #         self.__class__.__name__,
+        #         "-l",
+        #         "-n{},{}".format(start_at_animation_number, end_at_animation_number),
+        #         "-x{}".format(i)
+        #     ]
+        #     # print(*command)
+        #     p = subprocess.Popen(command)
+        #     plist.append(p)
 
-        while True:
-            running = False
-            for i in range(job_number):
-                p = plist[i]
-                poll = p.poll()
-                if poll == None:
-                    # p.subprocess is alive
-                    running = True
-            if not running:
-                break
-            time.sleep(1)
-        # todo: combine movie
-        self.file_writer.finish(True)
+        # while True:
+        #     running = False
+        #     for i in range(job_number):
+        #         p = plist[i]
+        #         poll = p.poll()
+        #         if poll == None:
+        #             # p.subprocess is alive
+        #             running = True
+        #     if not running:
+        #         break
+        #     time.sleep(1)
+        # # todo: combine movie
+        # self.file_writer.finish(True)
 
 
     def __str__(self):
@@ -1226,12 +1229,14 @@ class Scene(Container):
         self.increment_time(len(frames) * dt)
         if self.skip_animations:
             return
-        idx = int(time.time())
-        i = 0
         for frame in frames:
-            i += 1
-            # np.save('FRAME_{}_{}.npy'.format(idx, i), frame)
-            self.file_writer.write_frame(frame)
+            self.frame_num += 1
+            print("{} {} ".format(self.num_plays, self.frame_num))
+            if self.id_of_process > 0:
+                self.file_writer.write_npy_frame(self.frame_num, frame)
+            else:
+                # self.file_writer.write_npy_frame(self.frame_num, frame)
+                self.file_writer.write_frame(frame)
 
     def add_sound(self, sound_file, time_offset=0, gain=None, **kwargs):
         """

@@ -536,3 +536,15 @@ class SceneFileWriter(object):
         Prints the "File Ready" message to STDOUT.
         """
         print("\nFile ready at {}\n".format(file_path))
+
+
+    def write_npy_frame(self, i, frame):
+        """
+        Used internally by Manim to initalise
+        FFMPEG and begin writing to FFMPEG's input
+        buffer.
+        """
+        file_path = self.get_next_partial_movie_path()
+        npy_file_path = os.path.splitext(file_path)[0] + "{:06}.npy".format(i)
+        print("filename: {}".format(npy_file_path))
+        np.save(npy_file_path, frame)
