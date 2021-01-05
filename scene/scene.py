@@ -1235,7 +1235,7 @@ class Scene(Container):
             if self.id_of_process > 0:
                 self.file_writer.write_npy_frame(self.frame_num, frame)
             else:
-                # self.file_writer.write_npy_frame(self.frame_num, frame)
+                self.file_writer.write_npy_frame(self.frame_num, frame)
                 self.file_writer.write_frame(frame)
 
     def add_sound(self, sound_file, time_offset=0, gain=None, **kwargs):
